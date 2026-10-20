@@ -1,0 +1,214 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>
+<title>틴트 발색 테스트</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 실험 장비처럼 왼쪽 카메라 스테이지, 오른쪽 측정 패널. 좁으면 세로로 쌓임 */
+:root{
+  --bg:#f6f4f3; --panel:#ffffff; --fg:#231c1b; --muted:#7a6d6a; --line:#e4dcda; --accent:#b0453c; --stage:#1d1716;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#151111;--panel:#1f1919;--fg:#efe7e5;--muted:#a3938f;--line:#3a3030;--accent:#e07a6f;--stage:#0b0909;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151111;--panel:#1f1919;--fg:#efe7e5;--muted:#a3938f;--line:#3a3030;--accent:#e07a6f;--stage:#0b0909;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.5;
+  padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:12px}
+h1{font-size:18px;font-weight:600;margin:0;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.stage{background:var(--stage);border-radius:10px;overflow:hidden;position:relative;min-height:240px;display:flex;align-items:center;justify-content:center}
+canvas#out{display:block;width:100%;height:auto;touch-action:none;cursor:grab}
+canvas#out.drag{cursor:grabbing}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#e9dedb;text-align:center;padding:20px}
+.empty p{margin:0;max-width:36ch;font-size:13px;color:#c8b9b5}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button,.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn input{display:none}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.sec h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0 0 8px}
+label.row{display:grid;grid-template-columns:72px 1fr 48px;align-items:center;gap:8px;font-size:13px;margin:6px 0}
+label.row output{font-family:var(--mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+select{font:inherit;font-size:13px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.shade{display:flex;gap:10px;align-items:center;margin-top:8px}
+.chip{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);flex:none}
+.mono{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td,th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{color:var(--muted);font-weight:500}
+td.sw{width:22px}td.sw span{display:block;width:18px;height:18px;border-radius:4px;border:1px solid var(--line)}
+.de{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;font-size:13px}
+.de b{font-family:var(--mono);font-size:16px}
+.note{color:var(--muted);font-size:12px;margin:6px 0 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+
+<header>
+  <h1>틴트 발색 테스트</h1>
+  <span class="sub">롬앤 쥬시 래스팅 틴트 · 공식 컬러차트 추출색 · 원형 패치</span>
+</header>
+
+<div class="wrap">
+  <div>
+    <div class="stage" id="stage">
+      <canvas id="out" aria-label="카메라 화면과 틴트 색 원형 패치. 드래그해서 위치를 옮길 수 있음"></canvas>
+      <div class="empty" id="empty">
+        <strong>카메라를 켜거나 사진을 올려 주세요</strong>
+        <p id="emptyMsg">원을 입술 위로 끌어다 놓고 투명도를 조절해 보세요. 화장 전 사진을 올리면 같은 사진으로 반복 비교할 수 있어요.</p>
+        <div class="bar" style="justify-content:center">
+          <button id="camBtn2" type="button">카메라 켜기</button>
+          <label class="btn">사진 올리기<input id="file2" type="file" accept="image/*"></label>
+        </div>
+      </div>
+    </div>
+    <div class="bar">
+      <button id="camBtn" type="button">카메라 켜기</button>
+      <label class="btn">사진 올리기<input id="file" type="file" accept="image/*"></label>
+      <button id="freeze" type="button">화면 정지</button>
+      <button id="toggle" type="button" class="on">패치 표시</button>
+      <button id="mirror" type="button" class="on">좌우 반전</button>
+      <button id="copy" type="button">측정값 복사</button>
+    </div>
+    <p class="note">원 안쪽 70% 영역의 평균색을 측정해요. 패치를 끄면 맨입술 화면을 그대로 캡처할 수 있어요.</p>
+  </div>
+
+  <aside class="panel">
+    <div class="sec">
+      <h2>제품</h2>
+      <select id="shadeSel" aria-label="호수 선택"></select>
+      <div class="shade"><div class="chip" id="chip"></div><div><div id="shadeName" style="font-weight:500"></div><div class="mono" id="shadeVal"></div></div></div>
+    </div>
+    <div class="sec">
+      <h2>패치 설정</h2>
+      <label class="row">투명도 α<input id="alpha" type="range" min="0" max="100" value="60"><output id="alphaO">0.60</output></label>
+      <label class="row">크기<input id="size" type="range" min="20" max="400" value="110"><output id="sizeO">110</output></label>
+      <label class="row">가장자리<input id="feather" type="range" min="0" max="60" value="20"><output id="featherO">20%</output></label>
+      <label class="row" style="grid-template-columns:72px 1fr">합성 방식
+        <select id="mode">
+          <option value="source-over">일반 (색 덮기)</option>
+          <option value="multiply">곱하기 (multiply)</option>
+          <option value="soft-light">소프트 라이트</option>
+          <option value="color">색상 (color)</option>
+        </select>
+      </label>
+    </div>
+    <div class="sec">
+      <h2>측정값 (원 안쪽)</h2>
+      <table>
+        <thead><tr><th></th><th>구분</th><th>HEX</th><th>L* a* b*</th></tr></thead>
+        <tbody>
+          <tr><td class="sw"><span id="sw0"></span></td><td>제품색</td><td class="mono" id="h0">–</td><td class="mono" id="l0">–</td></tr>
+          <tr><td class="sw"><span id="sw1"></span></td><td>맨입술</td><td class="mono" id="h1">–</td><td class="mono" id="l1">–</td></tr>
+          <tr><td class="sw"><span id="sw2"></span></td><td>기대값</td><td class="mono" id="h2">–</td><td class="mono" id="l2">–</td></tr>
+          <tr><td class="sw"><span id="sw3"></span></td><td>AR값</td><td class="mono" id="h3">–</td><td class="mono" id="l3">–</td></tr>
+        </tbody>
+      </table>
+      <div class="de"><span>ΔE00 (기대값↔AR값)</span><b id="de">–</b></div>
+      <p class="note">기대값 = (1−α)·맨입술 + α·제품색, 선형광(linear RGB)에서 섞은 값이에요. AR값은 화면에 실제로 그려진 색이에요. 실제로 바른 사진은 같은 위치에 원을 두고 패치를 끈 채 측정하면 돼요.</p>
+    </div>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const SHADES=[["01","포멜로 스킨","#CC7553"],["02","누카다미아","#BF5643"],["03","베어 그레이프","#D16B5F"],["04","피그 피그","#B3353B"],["05","쥬쥬브","#D9625B"],["06","필링 앵두","#C8544D"],["07","체리 밤","#A61320"],["08","핑크 펌킨","#CD4935"],["09","멀드 피치","#CE6152"],["10","베어 애프리콧","#EC7868"],["11","파파야 잼","#DB5A46"],["12","애플 브라운","#CB5637"],["13","잇 도토리","#B73824"],["14","아몬드 로즈","#B35447"],["15","베어 피그","#BC5E64"],["16","플럼 콕","#A93844"],["17","다크 코코넛","#B75F41"],["19","썸머 센트","#D30F1D"],["20","쥬쥬 피그","#CC4746"],["21","그레이프 밤","#C01E35"],["22","도토리 밤","#AF2D23"],["23","피치 피치 미","#E1645E"],["24","베어 쥬시 오","#E46D47"]];
+const $=id=>document.getElementById(id);
+const out=$('out'),ctx=out.getContext('2d',{willReadFrequently:true});
+const src=document.createElement('canvas'),sctx=src.getContext('2d',{willReadFrequently:true});
+const video=document.createElement('video');video.playsInline=true;video.muted=true;
+let mode='none',frozen=false,showPatch=true,mirror=true,img=null,stream=null;
+let cx=0,cy=0,shade=SHADES[2],last={};
+
+// 색 변환
+const hex2rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const rgb2hex=a=>'#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('').toUpperCase();
+const lin=v=>{v/=255;return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4)};
+const delin=v=>255*(v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
+function lab([r,g,b]){const R=lin(r),G=lin(g),B=lin(b);const X=(R*.4124+G*.3576+B*.1805)/.95047,Y=R*.2126+G*.7152+B*.0722,Z=(R*.0193+G*.1192+B*.9505)/1.08883;const f=t=>t>.008856?Math.cbrt(t):7.787*t+16/116;return[116*f(Y)-16,500*(f(X)-f(Y)),200*(f(Y)-f(Z))]}
+function de2000(a,b){const [L1,a1,b1]=a,[L2,a2,b2]=b,d=Math.PI/180;const C1=Math.hypot(a1,b1),C2=Math.hypot(a2,b2),Cb=(C1+C2)/2,G=.5*(1-Math.sqrt(Cb**7/(Cb**7+25**7)));const a1p=(1+G)*a1,a2p=(1+G)*a2,C1p=Math.hypot(a1p,b1),C2p=Math.hypot(a2p,b2);const h=(x,y)=>{if(!x&&!y)return 0;let t=Math.atan2(y,x)/d;return t<0?t+360:t};const h1=h(a1p,b1),h2=h(a2p,b2);const dL=L2-L1,dC=C2p-C1p;let dh=0;if(C1p*C2p){dh=h2-h1;if(dh>180)dh-=360;else if(dh<-180)dh+=360}const dH=2*Math.sqrt(C1p*C2p)*Math.sin(dh*d/2);const Lb=(L1+L2)/2,Cbp=(C1p+C2p)/2;let hb=h1+h2;if(C1p*C2p){hb=Math.abs(h1-h2)>180?(h1+h2<360?(h1+h2+360)/2:(h1+h2-360)/2):(h1+h2)/2}const T=1-.17*Math.cos((hb-30)*d)+.24*Math.cos(2*hb*d)+.32*Math.cos((3*hb+6)*d)-.2*Math.cos((4*hb-63)*d);const dth=30*Math.exp(-(((hb-275)/25)**2));const RC=2*Math.sqrt(Cbp**7/(Cbp**7+25**7));const SL=1+.015*(Lb-50)**2/Math.sqrt(20+(Lb-50)**2),SC=1+.045*Cbp,SH=1+.015*Cbp*T,RT=-Math.sin(2*dth*d)*RC;return Math.sqrt((dL/SL)**2+(dC/SC)**2+(dH/SH)**2+RT*(dC/SC)*(dH/SH))}
+const fmtLab=l=>l.map(v=>v.toFixed(1)).join(' ');
+
+// 호수 목록
+SHADES.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s[0]+' '+s[1];$('shadeSel').appendChild(o)});
+$('shadeSel').value=2;
+function setShade(){shade=SHADES[+$('shadeSel').value];$('chip').style.background=shade[2];$('shadeName').textContent=shade[0]+' '+shade[1];$('shadeVal').textContent=shade[2]+'  ·  Lab '+fmtLab(lab(hex2rgb(shade[2])))}
+$('shadeSel').onchange=setShade;setShade();
+
+// 슬라이더 표시
+const sync=()=>{$('alphaO').value=($('alpha').value/100).toFixed(2);$('sizeO').value=$('size').value;$('featherO').value=$('feather').value+'%'};
+['alpha','size','feather'].forEach(k=>$(k).oninput=sync);sync();
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),1600)}
+
+function setSize(w,h){const s=Math.min(1,1280/w);out.width=src.width=Math.round(w*s);out.height=src.height=Math.round(h*s);cx=out.width/2;cy=out.height*0.62;$('empty').hidden=true}
+
+async function startCam(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream;await video.play();img=null;mode='video';frozen=false;$('freeze').classList.remove('on');$('freeze').textContent='화면 정지';
+    setSize(video.videoWidth,video.videoHeight);
+  }catch(e){
+    $('emptyMsg').textContent='이 화면에서는 카메라를 쓸 수 없어요. 사진 올리기로 진행하거나, 파일을 내려받아 크롬에서 직접 열면 실시간 카메라를 쓸 수 있어요.';
+    $('empty').hidden=false;toast('카메라를 켤 수 없어요');
+  }
+}
+function loadFile(f){if(!f)return;const im=new Image();im.onload=()=>{if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}img=im;mode='image';setSize(im.naturalWidth,im.naturalHeight);drawSrc()};im.src=URL.createObjectURL(f)}
+$('camBtn').onclick=$('camBtn2').onclick=startCam;
+$('file').onchange=e=>loadFile(e.target.files[0]);$('file2').onchange=e=>loadFile(e.target.files[0]);
+$('freeze').onclick=()=>{if(mode!=='video')return;frozen=!frozen;$('freeze').classList.toggle('on',frozen);$('freeze').textContent=frozen?'정지 해제':'화면 정지'};
+$('toggle').onclick=()=>{showPatch=!showPatch;$('toggle').classList.toggle('on',showPatch);$('toggle').textContent=showPatch?'패치 표시':'패치 숨김'};
+$('mirror').onclick=()=>{mirror=!mirror;$('mirror').classList.toggle('on',mirror);if(mode==='image')drawSrc()};
+
+function drawSrc(){const s=mode==='video'?video:img;if(!s)return;sctx.save();sctx.setTransform(1,0,0,1,0,0);if(mirror){sctx.translate(src.width,0);sctx.scale(-1,1)}sctx.drawImage(s,0,0,src.width,src.height);sctx.restore()}
+
+// 드래그
+let drag=null;
+function pos(e){const r=out.getBoundingClientRect();return[(e.clientX-r.left)*out.width/r.width,(e.clientY-r.top)*out.height/r.height]}
+out.addEventListener('pointerdown',e=>{if(mode==='none')return;const[x,y]=pos(e);drag=[x-cx,y-cy];out.setPointerCapture(e.pointerId);out.classList.add('drag')});
+out.addEventListener('pointermove',e=>{if(!drag)return;const[x,y]=pos(e);cx=Math.max(0,Math.min(out.width,x-drag[0]));cy=Math.max(0,Math.min(out.height,y-drag[1]))});
+out.addEventListener('pointerup',()=>{drag=null;out.classList.remove('drag')});
+
+function avg(c2d,r){const x0=Math.max(0,Math.floor(cx-r)),y0=Math.max(0,Math.floor(cy-r)),w=Math.min(out.width,Math.ceil(cx+r))-x0,h=Math.min(out.height,Math.ceil(cy+r))-y0;if(w<=0||h<=0)return null;const d=c2d.getImageData(x0,y0,w,h).data;let s=[0,0,0],n=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const dx=x0+x-cx,dy=y0+y-cy;if(dx*dx+dy*dy>r*r)continue;const i=(y*w+x)*4;s[0]+=d[i];s[1]+=d[i+1];s[2]+=d[i+2];n++}return n?s.map(v=>v/n):null}
+
+function setRow(i,rgb){const h=$('h'+i),l=$('l'+i),sw=$('sw'+i);if(!rgb){h.textContent=l.textContent='–';sw.style.background='transparent';return}h.textContent=rgb2hex(rgb);l.textContent=fmtLab(lab(rgb));sw.style.background=rgb2hex(rgb)}
+
+let tick=0;
+function frame(){
+  requestAnimationFrame(frame);
+  if(mode==='none')return;
+  if(mode==='video'&&!frozen)drawSrc();
+  ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.drawImage(src,0,0);
+  const R=+$('size').value/2*(out.width/640),a=$('alpha').value/100,f=$('feather').value/100;
+  if(showPatch&&a>0){
+    const g=ctx.createRadialGradient(cx,cy,R*(1-f),cx,cy,R);g.addColorStop(0,shade[2]);g.addColorStop(1,shade[2]+'00');
+    ctx.globalCompositeOperation=$('mode').value;ctx.globalAlpha=a;ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();
+    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
+  }
+  if(++tick%6)return;
+  const r=R*0.7,prod=hex2rgb(shade[2]),base=avg(sctx,r),ar=showPatch?avg(ctx,r):null;
+  const exp=base?[0,1,2].map(j=>delin((1-a)*lin(base[j])+a*lin(prod[j]))):null;
+  setRow(0,prod);setRow(1,base);setRow(2,exp);setRow(3,ar);
+  $('de').textContent=(exp&&ar)?de2000(lab(exp),lab(ar)).toFixed(2):'–';
+  last={base,exp,ar,a,mode:$('mode').value,f};
+}
+requestAnimationFrame(frame);
+
+$('copy').onclick=async()=>{
+  if(!last.base){toast('먼저 카메라나 사진을 켜 주세요');return}
+  const c=v=>v?rgb2hex(v)+'\t'+fmtLab(lab(v)):'\t';
+  const de=(last.exp&&last.ar)?de2000(lab(last.exp),lab(last.ar)).toFixed(2):'';
+  const row=[shade[0]+' '+shade[1],shade[2],last.a.toFixed(2),last.mode,c(last.base),c(last.exp),c(last.ar),de].join('\t');
+  try{await navigator.clipboard.writeText(row);toast('복사했어요. 기록표에 붙여넣으세요')}catch(e){toast('복사가 막혀 있어요. 화면의 값을 직접 옮겨 주세요')}
+};
+</script>
+
+</body></html>
