@@ -54,7 +54,7 @@ td.sw{width:22px}td.sw span{display:block;width:18px;height:18px;border-radius:4
 
 <header>
   <h1>틴트 발색 테스트</h1>
-  <span class="sub">롬앤 쥬시 래스팅 틴트 · 공식 컬러차트 추출색 · 원형 패치</span>
+  <span class="sub">롬앤 쥬시 래스팅 틴트 · 올리브영 옵션 이미지 추출색 · 원형 패치</span>
 </header>
 
 <div class="wrap">
@@ -86,6 +86,7 @@ td.sw{width:22px}td.sw span{display:block;width:18px;height:18px;border-radius:4
     <div class="sec">
       <h2>제품</h2>
       <select id="shadeSel" aria-label="호수 선택"></select>
+      <select id="srcSel" aria-label="색상 출처" style="margin-top:6px"><option value="oy">출처: 올리브영 옵션 이미지</option><option value="rm">출처: 롬앤 공식 컬러차트</option></select>
       <div class="shade"><div class="chip" id="chip"></div><div><div id="shadeName" style="font-weight:500"></div><div class="mono" id="shadeVal"></div></div></div>
     </div>
     <div class="sec">
@@ -121,7 +122,8 @@ td.sw{width:22px}td.sw span{display:block;width:18px;height:18px;border-radius:4
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const SHADES=[["01","포멜로 스킨","#CC7553"],["02","누카다미아","#BF5643"],["03","베어 그레이프","#D16B5F"],["04","피그 피그","#B3353B"],["05","쥬쥬브","#D9625B"],["06","필링 앵두","#C8544D"],["07","체리 밤","#A61320"],["08","핑크 펌킨","#CD4935"],["09","멀드 피치","#CE6152"],["10","베어 애프리콧","#EC7868"],["11","파파야 잼","#DB5A46"],["12","애플 브라운","#CB5637"],["13","잇 도토리","#B73824"],["14","아몬드 로즈","#B35447"],["15","베어 피그","#BC5E64"],["16","플럼 콕","#A93844"],["17","다크 코코넛","#B75F41"],["19","썸머 센트","#D30F1D"],["20","쥬쥬 피그","#CC4746"],["21","그레이프 밤","#C01E35"],["22","도토리 밤","#AF2D23"],["23","피치 피치 미","#E1645E"],["24","베어 쥬시 오","#E46D47"]];
+const SHADES=[["01", "포멜로스킨", "#D2765D", "#CC7553"], ["02", "누카다미아", "#B35548", "#BF5643"], ["03", "베어 그레이프", "#C2646C", "#D16B5F"], ["04", "피그피그", "#A03142", "#B3353B"], ["05", "쥬쥬브", "#CB4947", "#D9625B"], ["06", "필링앵두", "#912B34", "#C8544D"], ["07", "체리밤", "#870310", "#A61320"], ["09", "멀드 피치", "#C45846", "#CE6152"], ["10", "베어 애프리콧", "#FE6867", "#EC7868"], ["11", "파파야 잼", "#EA5F4D", "#DB5A46"], ["13", "잇 도토리", "#9C2B14", "#B73824"], ["14", "아몬드 로즈", "#B44F47", "#B35447"], ["16", "플럼 콕", "#770A14", "#A93844"], ["19", "썸머 센트", "#FB1924", "#D30F1D"], ["20", "쥬쥬 피그", "#B44453", "#CC4746"], ["21", "그레이프 밤", "#BE2158", "#C01E35"], ["22", "도토리 밤", "#871414", "#AF2D23"], ["23", "피치 피치 미", "#F67F8D", "#E1645E"], ["24", "베어 쥬시 오", "#FB7F49", "#E46D47"], ["26", "신비 복숭아", "#FD5E62", null], ["27", "허니 듀 멜론", "#FE9E89", null], ["28", "설화 딸기", "#FE9BAE", null], ["29", "조선 무화과", "#F37D74", null], ["30", "보늬 밤", "#CC7359", null], ["41", "소이아몬드", "#AF6D5D", null], ["42", "소이 피그", "#B6676C", null], ["43", "땅콩 베이지", "#B86D5F", null]];
+let SRC='oy';
 const $=id=>document.getElementById(id);
 const out=$('out'),ctx=out.getContext('2d',{willReadFrequently:true});
 const src=document.createElement('canvas'),sctx=src.getContext('2d',{willReadFrequently:true});
@@ -141,7 +143,8 @@ const fmtLab=l=>l.map(v=>v.toFixed(1)).join(' ');
 // 호수 목록
 SHADES.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s[0]+' '+s[1];$('shadeSel').appendChild(o)});
 $('shadeSel').value=2;
-function setShade(){shade=SHADES[+$('shadeSel').value];$('chip').style.background=shade[2];$('shadeName').textContent=shade[0]+' '+shade[1];$('shadeVal').textContent=shade[2]+'  ·  Lab '+fmtLab(lab(hex2rgb(shade[2])))}
+$('srcSel').onchange=()=>{SRC=$('srcSel').value;setShade()};
+function setShade(){const r=SHADES[+$('shadeSel').value];const hx=SRC==='rm'?r[3]:r[2];if(!hx){$('srcSel').value='oy';SRC='oy';return setShade()}shade=[r[0],r[1],hx];$('chip').style.background=hx;$('shadeName').textContent=r[0]+' '+r[1];$('shadeVal').textContent=hx+'  ·  Lab '+fmtLab(lab(hex2rgb(hx)))+(r[3]?'':'  ·  컬러차트 값 없음')}
 $('shadeSel').onchange=setShade;setShade();
 
 // 슬라이더 표시
