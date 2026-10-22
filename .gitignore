@@ -3,6 +3,8 @@ cookie.txt.txt
 cookie
 *.xlsx
 *.csv
+*.done
+*.repair.tmp
 ~$*.xlsx
 __pycache__/
 *.py[cod]
