@@ -1,0 +1,8 @@
+cookie.txt
+cookie.txt.txt
+cookie
+*.xlsx
+*.csv
+~$*.xlsx
+__pycache__/
+*.py[cod]
