@@ -13,12 +13,17 @@
 
 pip install requests pillow
 """
-import csv, io, os, re, json, time, threading
+import csv, io, os, re, json, time, threading, sys
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from datetime import datetime
 
 import requests
 from PIL import Image
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 BASE = "https://m.oliveyoung.co.kr"
 LIST_API = f"{BASE}/shop-around/api/display-category/v1/goods"
