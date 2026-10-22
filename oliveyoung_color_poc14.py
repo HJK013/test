@@ -28,7 +28,7 @@ TARGETS = {"립메이크업": "100000100020006",
 PER_CATEGORY = None     # None이면 카테고리의 전체 상품; 정수를 넣으면 해당 개수까지만
 PRODUCT_WORKERS = 40      # 동시에 수집할 상품 수
 IMAGE_WORKERS = 80        # 전체 상품을 통틀어 동시에 다운로드할 이미지 수
-THREAD_DELAY = 0          # 429가 나오면 즉시 중단하므로 고정 대기 없음
+THREAD_DELAY = 0          # 403/429가 나오면 즉시 중단하므로 고정 대기 없음
 IMG_SIZE = 300            # 분석용 컬러칩 크기
 MIN_COLOR_FRAC = 0.5      # 유채색 비율이 이보다 낮으면 제품 사진으로 보고 HEX 제외 (테스트 스크립트와 동일)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -59,7 +59,15 @@ _page_thread = threading.local()
 STOP_EVENT = threading.Event()
 
 
-class RateLimited(RuntimeError):
+class Blocked(RuntimeError):
+    pass
+
+
+class RateLimited(Blocked):
+    pass
+
+
+class Forbidden(Blocked):
     pass
 
 
@@ -79,7 +87,7 @@ def throttle(local):
 
 def request(method, url, **kw):
     if STOP_EVENT.is_set():
-        raise RateLimited("429 발생으로 수집 중단")
+        raise Blocked("403/429 발생으로 수집 중단")
     headers = {**PAGE_HEADERS, **kw.pop("headers", {})}
     throttle(_page_thread)
     r = page_session().request(method, url, timeout=20, headers=headers, **kw)
@@ -87,7 +95,8 @@ def request(method, url, **kw):
         STOP_EVENT.set()
         raise RateLimited(f"429 응답: {url.split('?')[0]}")
     if r.status_code == 403:
-        raise RuntimeError(f"차단됨(403, {r.headers.get('server', '?')})")
+        STOP_EVENT.set()
+        raise Forbidden(f"403 응답: {url.split('?')[0]} ({r.headers.get('server', '?')})")
     r.raise_for_status()
     return r
 
@@ -390,9 +399,9 @@ def image_session():
 
 
 def download_img(url):
-    """CDN 이미지를 받고 429가 나오면 전체 수집을 중단한다."""
+    """CDN 이미지를 받고 403/429가 나오면 전체 수집을 중단한다."""
     if STOP_EVENT.is_set():
-        raise RateLimited("429 발생으로 수집 중단")
+        raise Blocked("403/429 발생으로 수집 중단")
     throttle(_image_thread)
     r = image_session().get(f"{url}?RS={IMG_SIZE}x0&QT=100", timeout=20,
                             headers=IMAGE_HEADERS)
@@ -400,7 +409,8 @@ def download_img(url):
         STOP_EVENT.set()
         raise RateLimited("이미지 CDN 429 응답")
     if r.status_code == 403:
-        raise RuntimeError("이미지 CDN 차단(403) – 접속 상태 확인 필요")
+        STOP_EVENT.set()
+        raise Forbidden("이미지 CDN 403 응답")
     r.raise_for_status()
     return r.content
 
@@ -415,7 +425,7 @@ def product_images():
 def prefetch_images(opts, shared_urls, rule, image_pool):
     """상품별 캐시에 이미지를 보관하고, 전체 공용 풀에서 내려받는다."""
     if STOP_EVENT.is_set():
-        raise RateLimited("429 발생으로 수집 중단")
+        raise Blocked("403/429 발생으로 수집 중단")
     cache, errors = product_images()
     urls = list(dict.fromkeys(
         url for o in opts for url in candidates(o, rule)
@@ -429,17 +439,17 @@ def prefetch_images(opts, shared_urls, rule, image_pool):
         try:
             cache[url] = task.result()
             errors.pop(url, None)
-        except RateLimited:
+        except Blocked:
             raise
         except Exception as e:
             if STOP_EVENT.is_set():
-                raise RateLimited("429 발생으로 수집 중단") from e
+                raise Blocked("403/429 발생으로 수집 중단") from e
             errors[url] = str(e)
 
 
 def fetch_img(url):
     if STOP_EVENT.is_set():
-        raise RateLimited("429 발생으로 수집 중단")
+        raise Blocked("403/429 발생으로 수집 중단")
     cache, errors = product_images()
     if url in errors:
         raise RuntimeError(errors[url])
@@ -591,7 +601,7 @@ def judge_texture(goods_no, goods_name):
             tex, word = find_texture(f"{title} {desc}")
             if tex:
                 return tex, f"리뷰 언급 '{title.strip()}' ('{word}')"
-    except RateLimited:
+    except Blocked:
         raise
     except Exception as e:
         print(f"      리뷰 요약 실패: {e}")
@@ -602,7 +612,7 @@ def judge_texture(goods_no, goods_name):
             return tex, note
         if note:
             return "", f"판정 불가 ({note})"
-    except RateLimited:
+    except Blocked:
         raise
     except Exception as e:
         print(f"      리뷰 통계 실패: {e}")
@@ -613,7 +623,7 @@ def judge_texture(goods_no, goods_name):
 # ───────── 5. 상품 1개 → 행 목록 ─────────
 def crawl_goods(mid_name, goods_no, image_pool):
     if STOP_EVENT.is_set():
-        raise RateLimited("429 발생으로 수집 중단")
+        raise Blocked("403/429 발생으로 수집 중단")
     _product_thread.cache = {}
     _product_thread.errors = {}
     _product_thread.image_pool = image_pool
@@ -654,7 +664,7 @@ def crawl_goods(mid_name, goods_no, image_pool):
             if rule == "line" and not r[0]:
                 r = (r[0], r[1], f"브로우·라이너 – 옵션 이미지에 발색(그은 선) 없음, 얼굴 사진은 제외 / {r[2]}", r[3])
             results.append(r)
-        except RateLimited:
+        except Blocked:
             raise
         except Exception as e:
             print(f"\n      이미지 실패({o.get('optionName', '')}): {e}")
@@ -689,7 +699,7 @@ def crawl_goods(mid_name, goods_no, image_pool):
         rows.append(base + [hosu, hosu_name, opt, hexv, "", *lab, url, now] + tail +
                     [source, conf_label(conf) if rgb else ""])
     if STOP_EVENT.is_set():
-        raise RateLimited("429 발생으로 수집 중단")
+        raise Blocked("403/429 발생으로 수집 중단")
     return rows
 
 
@@ -751,7 +761,7 @@ def main():
             goods = list_goods(cat_no, PER_CATEGORY)
             jobs += [(mid_name, no) for no in goods]
             print(f"[{mid_name}] 상품 {len(goods)}개 확인")
-        except RateLimited as e:
+        except Blocked as e:
             print(f"목록 수집 중단: {e}")
             return 2
         except Exception as e:
@@ -765,7 +775,7 @@ def main():
     print(f"\n총 {len(jobs)}개 상품 | 이전 완료 {len(completed)}개 | CSV {total_rows}행")
 
     new_done = failures = 0
-    rate_limited = False
+    blocked = False
     if not os.path.isfile(OUT_CSV):
         with open(OUT_CSV, "w", newline="", encoding="utf-8-sig") as target:
             csv.writer(target).writerow(COLUMNS)
@@ -813,23 +823,23 @@ def main():
                     i, mid_name, no = inflight.pop(task)
                     try:
                         record(i, mid_name, no, task.result())
-                    except RateLimited as e:
-                        rate_limited = True
+                    except Blocked as e:
+                        blocked = True
                         STOP_EVENT.set()
-                        print(f"\n[429 중단] {e} | CSV 완료 {len(completed)}/{len(jobs)}개")
+                        print(f"\n[차단 중단] {e} | CSV 완료 {len(completed)}/{len(jobs)}개")
                     except Exception as e:
                         failures += 1
                         print(f"   {i:04d}. [{mid_name}] {no} 실패: {e}")
                 if new_done and new_done % 25 == 0:
                     print(f"       진행 {len(completed)}/{len(jobs)} | CSV {total_rows}행, HEX {hex_count}개 "
                           f"| 경과 {fmt_dur(time.time() - started)}")
-                if rate_limited:
+                if blocked:
                     break
                 refill()
         finally:
-            product_pool.shutdown(wait=True, cancel_futures=rate_limited)
-            image_pool.shutdown(wait=True, cancel_futures=rate_limited)
-            # 429 직전에 완료된 상품도 CSV에 기록한다.
+            product_pool.shutdown(wait=True, cancel_futures=blocked)
+            image_pool.shutdown(wait=True, cancel_futures=blocked)
+            # 차단 직전에 완료된 상품도 CSV에 기록한다.
             for task, (i, mid_name, no) in inflight.items():
                 if task.cancelled() or not task.done():
                     continue
@@ -843,8 +853,8 @@ def main():
           f"| CSV {total_rows}행, HEX {hex_count}개 | 파일 {OUT_CSV}")
     if failures:
         print(f"이번 실행 실패 상품: {failures}개 (재실행 시 재시도)")
-    if rate_limited:
-        print("429로 즉시 중단했습니다. IP 변경 후 같은 스크립트를 실행하면 CSV에서 이어집니다.")
+    if blocked:
+        print("403/429로 즉시 중단했습니다. IP 변경 후 같은 스크립트를 실행하면 CSV에서 이어집니다.")
         return 2
     if len(completed) != len(jobs):
         print(f"미완료 상품 {len(jobs) - len(completed)}개. 재실행하면 CSV에서 이어집니다.")
